@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.python.framework import ops
 import math
+from random import *
 
 def unpickle(file):
     import cPickle
@@ -137,7 +138,7 @@ def compute_cost(Z5 , Y):
     
 def random_mini_batches(X , Y , mini_batch_size , seed):
     np.random.seed(seed)
-    m = X.shape[1]
+    m = X.shape[0]
     mini_batches = []
     
     permutation = list(np.random.permutation(m))
@@ -159,14 +160,15 @@ def random_mini_batches(X , Y , mini_batch_size , seed):
     return mini_batches 
     
 def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.001,
-          num_epochs = 100, minibatch_size = 64, print_cost = True):
+          num_epochs = 100, minibatch_size = 16, print_cost = True):
     
     ops.reset_default_graph()                         
     tf.set_random_seed(1)                             
-    seed = 3                                        
+    seed = randint(1,100)                                       
     (m, n_H0, n_W0, n_C0) = X_train.shape             
     n_y = Y_train.shape[1]                            
-    costs = []                                        # To keep track of the cost
+    costs = []    
+    print m                                    # To keep track of the cost
     
     # Create Placeholders of the correct shape
     X, Y = create_placeholders(n_H0 , n_W0 , n_C0 , n_y)
@@ -200,13 +202,12 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.001,
         sess.run(init)
         
         # Do the training loop
-        for epoch in range(num_epochs):
+        for epoch in range(1000):
 
             minibatch_cost = 0.
             num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
             seed = seed + 1
             minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
-
             for minibatch in minibatches:
 
                 # Select a minibatch
@@ -215,7 +216,9 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.001,
        
                 
                 minibatch_cost += temp_cost / num_minibatches
-                
+                #print(sess.run(Z5 , {X:minibatch_X , Y:minibatch_Y}))
+                #print minibatch_Y.shape
+                #print "____________________"
 
             # Print the cost every epoch
             if print_cost == True and epoch % 5 == 0:
