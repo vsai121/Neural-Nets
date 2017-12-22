@@ -46,8 +46,9 @@ Y_test= np.zeros((X2.shape[0] , 10))
 for i in range (len(Y2)):
     for j in range(10):
         Y_test[i][j] = 0
-    Y_test[i,Y2[i]] = 1    
- 
+    Y_test[i,Y2[i]] = 1   
+    
+     
 #plt.imshow(X_train[25,:,:,:])
 #plt.show()   
 
@@ -60,8 +61,7 @@ for i in range (len(Y2)):
 def create_placeholders(n_h , n_w , n_c , n_y):
     X = tf.placeholder(shape=[None , n_h , n_w , n_c] , dtype=tf.float32)
     Y = tf.placeholder(shape=[None , n_y] , dtype=tf.float32)
-    Y_class = tf.argmax(Y , dimension=1)
-    return X , Y , Y_class
+    return X , Y
 
 def weight_variable(shape):
   initial = tf.truncated_normal(shape, stddev=0.1)
@@ -124,17 +124,18 @@ def forward_prop(X , parameters):
     Z3 = conv2d(P2 , W3)
     A3 = tf.nn.relu(Z3 + b3)
     
-    Z4 = tf.contrib.layers.fully_connected(Z3 , 64)
+    P3 = tf.contrib.layers.flatten(A3)
+    Z4 = tf.contrib.layers.fully_connected(P3 , 64)
     
     Z5 = tf.contrib.layers.fully_connected(Z4 , 10 , activation_fn = None)
-    
+    print Z5.shape
     return Z5
     
 def compute_cost(Z5 , Y):
     cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits= (Z5) , labels = (Y)))
     return cost
     
-def random_mini_batches(X , Y , mini_batch_size , seed=0):
+def random_mini_batches(X , Y , mini_batch_size , seed):
     np.random.seed(seed)
     m = X.shape[1]
     mini_batches = []
@@ -168,7 +169,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.001,
     costs = []                                        # To keep track of the cost
     
     # Create Placeholders of the correct shape
-    X, Y , Y_class = create_placeholders(n_H0 , n_W0 , n_C0 , n_y)
+    X, Y = create_placeholders(n_H0 , n_W0 , n_C0 , n_y)
 
     # Initialize parameters
     parameters = init_parameters()
@@ -228,7 +229,7 @@ def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.001,
         
         # Calculate accuracy on the test set
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
-        print(accuracy)
+        #print(accuracy)
         train_accuracy = accuracy.eval({X: X_train, Y: Y_train})
         test_accuracy = accuracy.eval({X: X_test, Y: Y_test})
         print("Train Accuracy:", train_accuracy)
