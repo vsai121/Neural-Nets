@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
+from tensorflow.python.framework import ops
+import math
 
 def unpickle(file):
     import cPickle
@@ -31,6 +33,20 @@ for i in range (len(Y)):
     for j in range(10):
         Y_train[i][j] = 0
     Y_train[i,Y[i]] = 1
+    
+images2 = unpickle("./cifar-10-batches-py/data_batch_2")
+
+X2 = images['data']
+Y2 = images['labels']
+
+X_test = convert_images(X2)
+
+Y_test= np.zeros((X2.shape[0] , 10))
+
+for i in range (len(Y2)):
+    for j in range(10):
+        Y_test[i][j] = 0
+    Y_test[i,Y2[i]] = 1    
  
 #plt.imshow(X_train[25,:,:,:])
 #plt.show()   
@@ -44,7 +60,7 @@ for i in range (len(Y)):
 def create_placeholders(n_h , n_w , n_c , n_y):
     X = tf.placeholder(shape=[None , n_h , n_w , n_c] , dtype=tf.float32)
     Y = tf.placeholder(shape=[None , n_y] , dtype=tf.float32)
-    Y_class = tf.argamax(Y , dimension=1)
+    Y_class = tf.argmax(Y , dimension=1)
     return X , Y , Y_class
 
 def weight_variable(shape):
@@ -69,7 +85,7 @@ def init_parameters():
     b1 = bias_variable([32])
     
     W2 = weight_variable([5,5,32,32])
-    b1 = bias_variable([32])
+    b2 = bias_variable([32])
       
     W3 = weight_variable([5,5,32,64])
     b3 = bias_variable([64])
@@ -86,6 +102,15 @@ def init_parameters():
     
 
 def forward_prop(X , parameters):
+
+    W1 = parameters['W1']
+    b1 = parameters['b1']
+    W2 = parameters['W2']
+    b2 = parameters['b2']
+    W3 = parameters['W3']
+    b3 = parameters['b3']
+    
+    
     Z1 = conv2d(X , W1)
     A1 = tf.nn.relu(Z1 + b1)
     
@@ -104,6 +129,120 @@ def forward_prop(X , parameters):
     Z5 = tf.contrib.layers.fully_connected(Z4 , 10 , activation_fn = None)
     
     return Z5
+    
+def compute_cost(Z5 , Y):
+    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits= (Z5) , labels = (Y)))
+    return cost
+    
+def random_mini_batches(X , Y , mini_batch_size , seed=0):
+    np.random.seed(seed)
+    m = X.shape[1]
+    mini_batches = []
+    
+    permutation = list(np.random.permutation(m))
+    shuffled_X = X[permutation , :]
+    shuffled_Y = Y[permutation , :]
+
+    num_complete_minibatches = int(math.floor(m/mini_batch_size)) 
+    for k in range(0, num_complete_minibatches):
+        mini_batch_X = shuffled_X[k*mini_batch_size:(k+1)*mini_batch_size ,:]
+        mini_batch_Y = shuffled_Y[k*mini_batch_size:(k+1)*mini_batch_size ,:]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+    if m % mini_batch_size != 0:
+        mini_batch_X = shuffled_X[mini_batch_size*num_complete_minibatches:m , :]
+        mini_batch_Y = shuffled_Y[mini_batch_size*num_complete_minibatches:m , :]
+        mini_batch = (mini_batch_X, mini_batch_Y)
+        mini_batches.append(mini_batch)
+    
+    return mini_batches 
+    
+def model(X_train, Y_train, X_test, Y_test, learning_rate = 0.001,
+          num_epochs = 100, minibatch_size = 64, print_cost = True):
+    
+    ops.reset_default_graph()                         
+    tf.set_random_seed(1)                             
+    seed = 3                                        
+    (m, n_H0, n_W0, n_C0) = X_train.shape             
+    n_y = Y_train.shape[1]                            
+    costs = []                                        # To keep track of the cost
+    
+    # Create Placeholders of the correct shape
+    X, Y , Y_class = create_placeholders(n_H0 , n_W0 , n_C0 , n_y)
+
+    # Initialize parameters
+    parameters = init_parameters()
+
+  
+    # Forward propagation: Build the forward propagation in the tensorflow graph
+
+    Z5 = forward_prop(X , parameters)
+
+    
+    # Cost function: Add cost function to tensorflow graph
+
+    cost = compute_cost(Z5 , Y)
+
+    
+    # Backpropagation: Define the tensorflow optimizer. Use an AdamOptimizer that minimizes the cost.
+
+    optimizer = tf.train.AdamOptimizer(learning_rate).minimize(cost)
+
+    
+    # Initialize all the variables globally
+    init = tf.global_variables_initializer()
+     
+    # Start the session to compute the tensorflow graph
+    with tf.Session() as sess:
+        
+        # Run the initialization
+        sess.run(init)
+        
+        # Do the training loop
+        for epoch in range(num_epochs):
+
+            minibatch_cost = 0.
+            num_minibatches = int(m / minibatch_size) # number of minibatches of size minibatch_size in the train set
+            seed = seed + 1
+            minibatches = random_mini_batches(X_train, Y_train, minibatch_size, seed)
+
+            for minibatch in minibatches:
+
+                # Select a minibatch
+                (minibatch_X, minibatch_Y) = minibatch
+                _ , temp_cost = sess.run([optimizer , cost] , {X:minibatch_X , Y:minibatch_Y})
+       
+                
+                minibatch_cost += temp_cost / num_minibatches
+                
+
+            # Print the cost every epoch
+            if print_cost == True and epoch % 5 == 0:
+                print ("Cost after epoch %i: %f" % (epoch, minibatch_cost))
+            if print_cost == True and epoch % 1 == 0:
+                costs.append(minibatch_cost)
+       
+        # Calculate the correct predictions
+        predict_op = tf.argmax(Z5, 1)
+        correct_prediction = tf.equal(predict_op, tf.argmax(Y, 1))
+        
+        # Calculate accuracy on the test set
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+        print(accuracy)
+        train_accuracy = accuracy.eval({X: X_train, Y: Y_train})
+        test_accuracy = accuracy.eval({X: X_test, Y: Y_test})
+        print("Train Accuracy:", train_accuracy)
+        print("Test Accuracy:", test_accuracy)
+                
+        return train_accuracy, test_accuracy, parameters
+
+
+
+train_acc , test_acc , parameters = model(X_train, Y_train, X_test, Y_test)
+
+           
+           
+         
     
         
     
